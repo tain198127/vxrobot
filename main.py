@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-import itchat
-import sys
-import time
-import  configparser
-# 需要监控的群
-ChatRoomUserNames=[]
+import configparser
 
-from itchat.content import *
+import itchat
+from snownlp import SnowNLP
+
+# 需要监控的群
+ChatRoomUserNames = []
+
 import logging
-logging.basicConfig()
+
+# logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
@@ -22,27 +23,53 @@ logger.addHandler(ch)
 
 cf = configparser.ConfigParser()
 cf.read('./conf/application.conf')
-chatroomsNames = cf.get('wechat','chatrooms')
+chatroomsNames = cf.get('wechat', 'chatrooms')
 itchat.auto_login(hotReload=True, enableCmdQR=2)
 
+
+def checker(fn):
+    def run(*args, **kwargs):
+        global ChatRoomUserNames
+        msg = args[0]
+        if msg is not None and msg.User is not None and msg.User.UserName is not None and msg.User.UserName in ChatRoomUserNames:
+            try:
+                result = fn(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                pass
+                # logger.error(e)
+
+    return run
+
+
 # 欢迎信息
-@itchat.msg_register([itchat.content.MAP, itchat.content.CARD, itchat.content.NOTE, itchat.content.SHARING, itchat.content.PICTURE,
-                      itchat.content.RECORDING, itchat.content.VOICE, itchat.content.ATTACHMENT, itchat.content.VIDEO, itchat.content.FRIENDS, itchat.content.SYSTEM],isGroupChat=True)
+
+@itchat.msg_register([itchat.content.NOTE, itchat.content.SYSTEM], isGroupChat=True)
 def welcomemsg(msg):
-    global ChatRoomUserNames
-    if msg is not None and msg.User is not None and msg.User.UserName is not None and msg.User.UserName in ChatRoomUserNames:
-        logger.info(msg)
+    sysInfo(msg)
+
 
 # 询问信息
-@itchat.msg_register([itchat.content.TEXT],isGroupChat=True)
-def ask(msg):
-    global ChatRoomUserNames
-    if msg is not None and msg.User is not None and msg.User.UserName is not None and msg.User.UserName in ChatRoomUserNames:
-        logger.info(msg)
 
-#定时广播
-def broadcast():
-    logger.info("定时广播")
+@itchat.msg_register([itchat.content.TEXT], isGroupChat=True)
+def ask(msg):
+    nlpAnalise(msg)
+
+
+@checker
+def sysInfo(msg):
+    logger.info(msg)
+
+@checker
+def nlpAnalise(msg):
+    logger.info(msg)
+
+    s = SnowNLP(msg.Content)
+    print('群id:{},群:{},userid{}，用户:{},时间:{}, 内容:{}, 情感:{},状态:{}'.format(msg.User.UserName, msg.User.NickName,
+                                                                        msg.ActualUserName,
+                                                                        msg.ActualNickName, msg.CreateTime, msg.Content,
+                                                                        s.sentiments, msg.Status))
 
 # 初始化聊天室监控信息
 def initChatRoom(isUpdate):
@@ -51,7 +78,8 @@ def initChatRoom(isUpdate):
     for room in chatrooms:
         if room['NickName'] in chatroomsNames:
             ChatRoomUserNames.append(room['UserName'])
-            print("群名称:{:<}       唯一识别号:{:>}".format(room['NickName'],room['UserName']))
+            print("群名称:{:<}       唯一识别号:{:>}".format(room['NickName'], room['UserName']))
+
 
 initChatRoom(True)
 

@@ -6,7 +6,8 @@ conf/
 *.pkl
 # C extensions
 *.so
-
+.idea/
+config/
 # Distribution / packaging
 .Python
 build/
